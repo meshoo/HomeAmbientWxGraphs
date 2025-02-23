@@ -1,0 +1,55 @@
+<nav class="top-nav">
+    <div class="nav-container">
+        <div class="nav-brand">Temperature Monitor</div>
+        <div class="nav-links">
+            <a href="/" class="nav-item <%= currentPage === 'current' ? 'active' : '' %>">Current</a>
+            <a href="/history" class="nav-item <%= currentPage === 'history' ? 'active' : '' %>">History</a>
+            <a href="/patterns" class="nav-item <%= currentPage === 'patterns' ? 'active' : '' %>">Patterns</a>
+        </div>
+    </div>
+</nav>
+
+<style>
+    .top-nav {
+        background: white;
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        margin-bottom: 1rem;
+    }
+
+    .nav-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0.5rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .nav-brand {
+        font-weight: 600;
+        font-size: 1.25rem;
+        color: var(--text-color);
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .nav-item {
+        padding: 0.5rem 1rem;
+        text-decoration: none;
+        color: var(--text-color);
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .nav-item:hover {
+        background: var(--background-color);
+    }
+
+    .nav-item.active {
+        background: var(--primary-color);
+        color: white;
+    }
+</style> 

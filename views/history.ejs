@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Temperature History</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --background-color: #f8fafc;
+            --card-background: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .controls {
+            background: var(--card-background);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .sensor-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .toggle-btn {
+            padding: 0.25rem 0.75rem;
+            border: 2px solid;
+            border-radius: 0.25rem;
+            background: transparent;
+            cursor: pointer;
+            font-size: 0.875rem;
+            opacity: 0.5;
+            transition: all 0.2s;
+        }
+
+        .toggle-btn.active {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .range-select {
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--card-background);
+            font-family: inherit;
+            font-size: 0.875rem;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .chart-container {
+            background: var(--card-background);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            height: 600px;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+
+        .nav-link:hover {
+            background-color: #1d4ed8;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .range-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/nav') %>
+
+    <div class="container">
+        <div class="controls">
+            <div class="sensor-toggles" id="sensorToggles">
+                <!-- Sensor toggle buttons will be added here -->
+            </div>
+            <select class="range-select" id="rangeSelect">
+                <option value="24h" <%= selectedRange === '24h' ? 'selected' : '' %>>Last 24 Hours</option>
+                <option value="7d" <%= selectedRange === '7d' ? 'selected' : '' %>>Last 7 Days</option>
+                <option value="1m" <%= selectedRange === '1m' ? 'selected' : '' %>>Last Month</option>
+                <option value="3m" <%= selectedRange === '3m' ? 'selected' : '' %>>Last 3 Months</option>
+            </select>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="tempChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Add verbose logging
+        console.log('Initializing history page');
+        console.log('Data received:', temperatures.length, 'readings');
+        console.log('Sensors:', sensors);
+        
+        const temperatures = JSON.parse('<%- JSON.stringify(temperatures) %>');
+        let chart;
+        
+        const colors = [
+            '#3b82f6', // blue
+            '#ef4444', // red
+            '#eab308', // yellow
+            '#22c55e', // green
+            '#8b5cf6', // purple
+            '#f97316', // orange
+            '#06b6d4', // cyan
+            '#ec4899', // pink
+            '#64748b'  // slate (outdoor temp)
+        ];
+
+        // Create toggle buttons for each sensor
+        const sensorToggles = document.getElementById('sensorToggles');
+        const toggleStates = new Array(sensors.length).fill(true);
+
+        sensors.forEach((sensor, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'toggle-btn active';
+            btn.textContent = sensor.name;
+            btn.style.borderColor = colors[i];
+            btn.onclick = () => toggleSensor(i);
+            sensorToggles.appendChild(btn);
+        });
+
+        function createChart() {
+            console.log('Creating chart...');
+            const ctx = document.getElementById('tempChart').getContext('2d');
+            
+            // Create datasets with error handling
+            const datasets = sensors.map((sensor, i) => {
+                const data = temperatures.map(reading => {
+                    const temp = reading[`temp${sensor.id}`];
+                    if (temp === undefined) {
+                        console.warn(`Missing temperature for sensor ${sensor.id} at time ${reading.time}`);
+                    }
+                    return temp;
+                });
+                
+                console.log(`Dataset for ${sensor.name}:`, {
+                    dataPoints: data.length,
+                    hasNull: data.includes(null),
+                    hasUndefined: data.includes(undefined)
+                });
+
+                return {
+                    label: sensor.name,
+                    data: data,
+                    borderColor: colors[i],
+                    backgroundColor: colors[i],
+                    tension: 0.1,
+                    borderWidth: 2,
+                    hidden: !toggleStates[i]
+                };
+            });
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: temperatures.map(data => {
+                        const date = new Date(data.time);
+                        if (isNaN(date)) {
+                            console.error('Invalid date:', data.time);
+                            return 'Invalid Date';
+                        }
+                        return date.toLocaleString();
+                    }),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Temperature (°F)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            onClick: null
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#1e293b',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            padding: 8,
+                            bodyFont: {
+                                family: 'Inter',
+                                size: 12
+                            },
+                            titleFont: {
+                                family: 'Inter',
+                                size: 12,
+                                weight: 600
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Chart created successfully');
+        }
+
+        function toggleSensor(index) {
+            toggleStates[index] = !toggleStates[index];
+            const btn = sensorToggles.children[index];
+            btn.classList.toggle('active');
+            
+            chart.data.datasets[index].hidden = !toggleStates[index];
+            chart.update();
+        }
+
+        document.getElementById('rangeSelect').addEventListener('change', (e) => {
+            window.location.href = `/history?range=${e.target.value}`;
+        });
+
+        createChart();
+    </script>
+</body>
+</html> 

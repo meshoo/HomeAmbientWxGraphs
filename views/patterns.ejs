@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Daily Temperature Patterns</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --background-color: #f8fafc;
+            --card-background: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0 0 1rem 0;
+        }
+
+        .controls {
+            background: var(--card-background);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .select {
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--card-background);
+            font-family: inherit;
+            font-size: 0.875rem;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .chart-container {
+            background: var(--card-background);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            height: 600px;
+        }
+
+        .sensor-chart {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            height: 400px;
+        }
+
+        .nav-links {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-link {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+
+        .nav-link:hover {
+            background-color: #1d4ed8;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+            .control-group {
+                width: 100%;
+            }
+            .select {
+                width: 100%;
+            }
+            .chart-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .sensor-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+
+        .sensor-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.25rem;
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .stats-container {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: var(--card-background);
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        }
+
+        .stats-container h2 {
+            margin: 0 0 1rem 0;
+        }
+
+        .stat {
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/nav') %>
+
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Daily Temperature Patterns</h1>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="timeSelect">Time:</label>
+                    <select id="timeSelect" class="select">
+                        <% times.forEach(time => { %>
+                            <option value="<%= time.name %>" <%= selectedTime === time.name ? 'selected' : '' %>>
+                                <%= time.name %> (<%= time.hour %>:00)
+                            </option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="monthSelect">Period:</label>
+                    <select id="monthSelect" class="select">
+                        <% [1,2,3,4,5,6].forEach(m => { %>
+                            <option value="<%= m %>" <%= months === m ? 'selected' : '' %>>
+                                <%= m %> Month<%= m > 1 ? 's' : '' %>
+                            </option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <button id="manageSensors" class="btn">Manage Sensors</button>
+                </div>
+            </div>
+            <% if (typeof error !== 'undefined') { %>
+                <div style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <%= error %>
+                </div>
+            <% } %>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="combinedChart"></canvas>
+        </div>
+
+        <div class="stats-container">
+            <h2>Channel Statistics</h2>
+            <div id="stats"></div>
+            <label>
+                <input type="checkbox" id="removeOutliers" checked>
+                Remove Outliers
+            </label>
+        </div>
+    </div>
+
+    <div id="sensorModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Manage Sensors</h2>
+            <div id="sensorList">
+                <!-- Sensors will be added here -->
+            </div>
+            <div class="modal-footer">
+                <button id="saveSensors" class="btn">Save</button>
+                <button id="closeModal" class="btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const patternData = JSON.parse('<%- data %>');
+        const selectedTime = '<%= selectedTime %>';
+        const settings = JSON.parse('<%- settings %>');
+        const colors = [
+            '#3b82f6', // blue
+            '#ef4444', // red
+            '#eab308', // yellow
+            '#22c55e', // green
+            '#8b5cf6', // purple
+            '#f97316', // orange
+            '#06b6d4', // cyan
+            '#ec4899'  // pink
+        ];
+        let chart;
+
+        // Initialize sensor settings
+        let sensorSettings = settings.sensors;
+
+        function createCharts() {
+            if (!patternData || patternData.length === 0) {
+                document.querySelector('.chart-container').innerHTML = 
+                    '<p style="text-align: center; padding: 2rem; color: #64748b;">No data available for the selected time period</p>';
+                return;
+            }
+
+            const chartContainer = document.querySelector('.chart-container');
+            chartContainer.innerHTML = '';
+            
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'sensor-chart';
+            
+            const canvas = document.createElement('canvas');
+            canvas.id = 'combinedChart';
+            chartDiv.appendChild(canvas);
+            chartContainer.appendChild(chartDiv);
+
+            const ctx = canvas.getContext('2d');
+            
+            const datasets = sensorSettings.map(sensor => ({
+                label: sensor.name,
+                data: patternData.map(d => d.temps[sensor.id - 1]),
+                borderColor: colors[sensor.id - 1],
+                backgroundColor: colors[sensor.id - 1],
+                tension: 0.1,
+                borderWidth: 2,
+                fill: false,
+                hidden: !sensor.enabled
+            }));
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: patternData.map(d => d.date),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Temperature (°F)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${selectedTime} Temperatures - All Sensors`,
+                            font: {
+                                size: 16,
+                                family: 'Inter'
+                            }
+                        },
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#1e293b',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            padding: 12,
+                            bodyFont: {
+                                family: 'Inter'
+                            },
+                            titleFont: {
+                                family: 'Inter',
+                                weight: 600
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Call updateStats to display initial statistics
+            updateStats();
+        }
+
+        // Sensor management
+        document.getElementById('manageSensors').addEventListener('click', () => {
+            const modal = document.getElementById('sensorModal');
+            const sensorList = document.getElementById('sensorList');
+            
+            sensorList.innerHTML = sensorSettings.map(sensor => `
+                <div class="sensor-item">
+                    <input type="text" class="sensor-input" 
+                        value="${sensor.name}" 
+                        data-sensor-id="${sensor.id}">
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${sensor.enabled ? 'checked' : ''}
+                            data-sensor-id="${sensor.id}">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            `).join('');
+            
+            modal.style.display = 'flex';
+        });
+
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.getElementById('sensorModal').style.display = 'none';
+        });
+
+        document.getElementById('saveSensors').addEventListener('click', async () => {
+            const inputs = document.querySelectorAll('.sensor-input');
+            const toggles = document.querySelectorAll('.toggle-switch input');
+            
+            sensorSettings = Array.from(inputs).map((input, i) => ({
+                id: parseInt(input.dataset.sensorId),
+                name: input.value,
+                enabled: toggles[i].checked
+            }));
+
+            try {
+                await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sensors: sensorSettings })
+                });
+                
+                document.getElementById('sensorModal').style.display = 'none';
+                createCharts();
+            } catch (error) {
+                console.error('Error saving settings:', error);
+            }
+        });
+
+        // Handle control changes
+        document.getElementById('timeSelect').addEventListener('change', updateUrl);
+        document.getElementById('monthSelect').addEventListener('change', updateUrl);
+
+        function updateUrl() {
+            const time = document.getElementById('timeSelect').value;
+            const months = document.getElementById('monthSelect').value;
+            window.location.href = `/patterns?time=${time}&months=${months}`;
+        }
+
+        function calculateStats(data, removeOutliers) {
+            const stats = {};
+            const channelCount = data[0].temps.length;
+
+            for (let i = 0; i < channelCount; i++) {
+                const channelData = data.map(d => d.temps[i]).filter(temp => temp !== null);
+                if (removeOutliers) {
+                    const avg = channelData.reduce((a, b) => a + b, 0) / channelData.length;
+                    const stdDev = Math.sqrt(channelData.map(x => Math.pow(x - avg, 2)).reduce((a, b) => a + b) / channelData.length);
+                    const threshold = 2 * stdDev; // Define threshold for outliers
+
+                    // Filter out outliers
+                    channelData = channelData.filter(temp => Math.abs(temp - avg) <= threshold);
+                }
+
+                const avg = channelData.reduce((a, b) => a + b, 0) / channelData.length;
+                const stdDev = Math.sqrt(channelData.map(x => Math.pow(x - avg, 2)).reduce((a, b) => a + b) / channelData.length);
+
+                stats[`Channel ${i + 1}`] = {
+                    average: avg.toFixed(2),
+                    stdDev: stdDev.toFixed(2)
+                };
+            }
+
+            return stats;
+        }
+
+        function displayStats(stats) {
+            const statsContainer = document.getElementById('stats');
+            statsContainer.innerHTML = '';
+
+            for (const [channel, values] of Object.entries(stats)) {
+                const statDiv = document.createElement('div');
+                statDiv.className = 'stat';
+                statDiv.innerHTML = `<strong>${channel}:</strong> Average: ${values.average}°F, Standard Deviation: ${values.stdDev}°F`;
+                statsContainer.appendChild(statDiv);
+            }
+        }
+
+        function updateStats() {
+            const removeOutliers = document.getElementById('removeOutliers').checked;
+            const stats = calculateStats(patternData, removeOutliers);
+            displayStats(stats);
+        }
+
+        document.getElementById('removeOutliers').addEventListener('change', updateStats);
+
+        createCharts();
+    </script>
+</body>
+</html> 

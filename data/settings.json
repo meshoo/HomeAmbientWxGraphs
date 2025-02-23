@@ -1,0 +1,44 @@
+{
+  "sensors": [
+    {
+      "id": 1,
+      "name": "1-Outside",
+      "enabled": true
+    },
+    {
+      "id": 2,
+      "name": "2-Office",
+      "enabled": false
+    },
+    {
+      "id": 3,
+      "name": "3-Family Room",
+      "enabled": false
+    },
+    {
+      "id": 4,
+      "name": "4-Basement",
+      "enabled": false
+    },
+    {
+      "id": 5,
+      "name": "5-Guest Bedroom",
+      "enabled": true
+    },
+    {
+      "id": 6,
+      "name": "6-Master Bedroom",
+      "enabled": true
+    },
+    {
+      "id": 7,
+      "name": "7-Kitchen",
+      "enabled": false
+    },
+    {
+      "id": 8,
+      "name": "8-Wine Storage",
+      "enabled": false
+    }
+  ]
+}
