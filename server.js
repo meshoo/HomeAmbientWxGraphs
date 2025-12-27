@@ -130,37 +130,54 @@ app.get('/history', async (req, res) => {
 
         // Fetch any missing data
         const newData = [];
+
+
+        // Loop through missing ranges
         for (const range of missingRanges) {
-            console.log(`\nFetching range: ${new Date(range.startDate).toLocaleDateString()} to ${new Date(range.endDate).toLocaleDateString()}`);
+            let current = range.startDate;
+            const end = range.endDate;
 
-            const params = {
-                startDate: range.startDate,
-                endDate: range.endDate,
-                limit: 288
-            };
+            // Break large ranges into daily chunks
+            while (current <= end) {
+                const chunkEnd = Math.min(end, current + (24 * 60 * 60 * 1000) - 1);
 
-            try {
-                const rangeData = await api.deviceData(process.env.DEVICE_MAC_ADDRESS, params);
-                console.log(`Retrieved ${rangeData.length} readings`);
+                // Only log significant chunks or the first one
+                console.log(`\nFetching chunk: ${new Date(current).toLocaleString()} to ${new Date(chunkEnd).toLocaleString()}`);
 
-                // Validate data structure
-                const validData = rangeData.filter(reading => {
-                    if (!reading.date) {
-                        console.warn('Reading missing date:', reading);
-                        return false;
+                const params = {
+                    startDate: current,
+                    endDate: chunkEnd,
+                    limit: 288
+                };
+
+                try {
+                    const rangeData = await api.deviceData(process.env.DEVICE_MAC_ADDRESS, params);
+                    console.log(`Retrieved ${rangeData.length} readings`);
+
+                    // Validate data structure
+                    const validData = rangeData.filter(reading => {
+                        if (!reading.date) {
+                            console.warn('Reading missing date:', reading);
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    newData.push(...validData);
+
+                    // Basic rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (error) {
+                    console.error('API call failed:', error.message);
+                    if (error.message.includes('rate limit')) {
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        // Retry this chunk if needed, for now just skip to avoid infinite loops
                     }
-                    return true;
-                });
-
-                newData.push(...validData);
-            } catch (error) {
-                console.error('API call failed:', error.message);
-                if (error.message.includes('rate limit')) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
-            }
 
-            await new Promise(resolve => setTimeout(resolve, 1000));
+                // Move to next day
+                current = chunkEnd + 1;
+            }
         }
 
         if (newData.length > 0) {

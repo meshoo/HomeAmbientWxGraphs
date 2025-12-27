@@ -222,7 +222,13 @@
                                 console.error('Invalid date:', data.time);
                                 return 'Invalid Date';
                             }
-                            return date.toLocaleString();
+                            // Format date based on range
+                            const range = '<%= selectedRange %>';
+                            if (range === '24h') {
+                                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            } else {
+                                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            }
                         }),
                         datasets: datasets
                     },
