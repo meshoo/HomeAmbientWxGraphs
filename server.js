@@ -8,10 +8,19 @@ const app = express();
 const port = 3000;
 
 // Configure Ambient Weather API client
-const api = new AmbientWeatherApi({
-    apiKey: process.env.AMBIENT_API_KEY,
-    applicationKey: process.env.AMBIENT_APPLICATION_KEY
-});
+const MockAmbientWeatherApi = require('./mockApi');
+
+// Configure Ambient Weather API client
+let api;
+if (process.env.USE_MOCK_DATA === 'true') {
+    console.log('Using Mock Ambient Weather API');
+    api = new MockAmbientWeatherApi();
+} else {
+    api = new AmbientWeatherApi({
+        apiKey: process.env.AMBIENT_API_KEY,
+        applicationKey: process.env.AMBIENT_APPLICATION_KEY
+    });
+}
 
 // Add this after the API client configuration
 const colors = [
@@ -39,7 +48,7 @@ function getDateRange(range) {
                 limit: 288 // Still include limit for API call
             };
         case '7d':
-            return { 
+            return {
                 endDate: now.getTime(),
                 startDate: now.getTime() - (7 * 24 * 60 * 60 * 1000)
             };
@@ -67,7 +76,7 @@ app.get('/', async (req, res) => {
         console.log('Fetching current temperature data...');
         const deviceData = await api.deviceData(process.env.DEVICE_MAC_ADDRESS, { limit: 1 });
         const settings = await getSettings(); // Get sensor settings
-        
+
         if (!deviceData || deviceData.length === 0) {
             console.error('No data received from device');
             return res.status(500).send('No data available from weather station');
@@ -84,7 +93,7 @@ app.get('/', async (req, res) => {
             color: colors[sensor.id - 1] // Use same colors as patterns
         }));
 
-        res.render('current', { 
+        res.render('current', {
             temperatures,
             outdoorTemp: deviceData[0].temp1f || 0,
             lastUpdate: new Date(deviceData[0].date).toLocaleString(),
@@ -123,7 +132,7 @@ app.get('/history', async (req, res) => {
         const newData = [];
         for (const range of missingRanges) {
             console.log(`\nFetching range: ${new Date(range.startDate).toLocaleDateString()} to ${new Date(range.endDate).toLocaleDateString()}`);
-            
+
             const params = {
                 startDate: range.startDate,
                 endDate: range.endDate,
@@ -133,7 +142,7 @@ app.get('/history', async (req, res) => {
             try {
                 const rangeData = await api.deviceData(process.env.DEVICE_MAC_ADDRESS, params);
                 console.log(`Retrieved ${rangeData.length} readings`);
-                
+
                 // Validate data structure
                 const validData = rangeData.filter(reading => {
                     if (!reading.date) {
@@ -179,8 +188,8 @@ app.get('/history', async (req, res) => {
         console.log('Data processing complete');
         console.log('═'.repeat(50));
 
-        res.render('history', { 
-            temperatures: JSON.stringify(temperatures),
+        res.render('history', {
+            temperatures: temperatures,
             selectedRange: range,
             sensors: settings.sensors,
             currentPage: 'history'
@@ -205,11 +214,11 @@ function logApiCall(params) {
 function calculateOptimalLimit(startDate, endDate, targetHour) {
     // Calculate number of days
     const days = Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000));
-    
+
     // We need readings around our target hour (±15 minutes)
     // At 5-minute intervals, that's about 7 readings per day
     const readingsPerDay = 7;
-    
+
     return Math.min(288, days * readingsPerDay); // Cap at max 288
 }
 
@@ -218,7 +227,7 @@ async function getDailyPatternData(months, hour, minute) {
     const now = new Date();
     const endDate = now.getTime();
     const startDate = now.getTime() - (months * 30 * 24 * 60 * 60 * 1000);
-    
+
     console.log('\nData Request:');
     console.log('═'.repeat(50));
     console.log(`Period: ${months} month(s)`);
@@ -238,7 +247,7 @@ async function getDailyPatternData(months, hour, minute) {
     const newData = [];
     for (const range of missingRanges) {
         console.log(`\nFetching missing data from ${new Date(range.startDate).toLocaleDateString()} to ${new Date(range.endDate).toLocaleDateString()}`);
-        
+
         const params = {
             startDate: range.startDate,
             endDate: range.endDate,
@@ -281,7 +290,7 @@ async function getDailyPatternData(months, hour, minute) {
         const readingDate = new Date(reading.date);
         const readingHour = readingDate.getHours();
         const readingMinute = readingDate.getMinutes();
-        
+
         const minuteDiff = (readingHour * 60 + readingMinute) - (hour * 60 + minute);
         return Math.abs(minuteDiff) <= 15;
     });
@@ -291,11 +300,11 @@ async function getDailyPatternData(months, hour, minute) {
     // Sort by date and group by day
     filteredData.sort((a, b) => new Date(a.date) - new Date(b.date));
     const dailyReadings = new Map();
-    
+
     filteredData.forEach(reading => {
         const date = new Date(reading.date);
         const dayKey = date.toLocaleDateString();
-        
+
         if (!dailyReadings.has(dayKey)) {
             dailyReadings.set(dayKey, reading);
         }
@@ -322,13 +331,13 @@ app.get('/patterns', async (req, res) => {
         const months = parseInt(req.query.months) || 1;
         const selectedTime = req.query.time || 'Breakfast';
         const settings = await getSettings();
-        
+
         const timeConfig = DEFAULT_TIMES.find(t => t.name === selectedTime) || DEFAULT_TIMES[0];
-        
+
         console.log(`Fetching ${months} month(s) of data for ${timeConfig.name} time (${timeConfig.hour}:${timeConfig.minute})...`);
-        
+
         const patternData = await getDailyPatternData(months, timeConfig.hour, timeConfig.minute);
-        
+
         if (!patternData || patternData.length === 0) {
             console.log('No data found for the specified time period');
             return res.render('patterns', {
@@ -343,11 +352,11 @@ app.get('/patterns', async (req, res) => {
         }
 
         console.log(`Processing ${patternData.length} readings...`);
-        
+
         // Process the data with proper date formatting and sensor data
         const processedData = patternData.map(reading => ({
             date: new Date(reading.date).toLocaleDateString(),
-            temps: Array.from({length: 8}, (_, i) => {
+            temps: Array.from({ length: 8 }, (_, i) => {
                 const temp = reading[`temp${i + 1}f`];
                 return typeof temp === 'number' ? temp : null;
             }),
@@ -393,7 +402,7 @@ app.post('/api/settings', express.json(), async (req, res) => {
 // Add API connection test on startup
 app.listen(port, async () => {
     console.log(`Server running at http://localhost:${port}`);
-    
+
     // Test API connection
     try {
         console.log('Testing API connection...');
